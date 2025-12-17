@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Карта России - Игра</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Карта России</h1>
+            <p class="subtitle">Изучайте регионы России</p>
+        </header>
+
+        <main>
+            <div class="game-info">
+                <div class="stats">
+                    <div class="stat-item">
+                        <span class="stat-label">Регионы:</span>
+                        <span class="stat-value" id="region-count">85</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Найдено:</span>
+                        <span class="stat-value" id="found-count">0</span>
+                    </div>
+                </div>
+
+                <div class="controls">
+                    <button id="hint-btn" class="btn">Подсказка</button>
+                    <button id="reset-btn" class="btn">Начать заново</button>
+                </div>
+            </div>
+
+            <div id="map-container">
+                <div id="map"></div>
+                <div id="region-info" class="info-panel">
+                    <h3>Информация о регионе</h3>
+                    <p>Нажмите на регион, чтобы узнать о нем больше</p>
+                    <div id="region-details"></div>
+                </div>
+            </div>
+
+            <div class="instructions">
+                <h3>Как играть:</h3>
+                <ul>
+                    <li>Кликните на любой регион на карте</li>
+                    <li>Узнайте информацию о регионе</li>
+                    <li>Попробуйте найти все регионы</li>
+                </ul>
+            </div>
+        </main>
+
+        <footer>
+            <p>Карта России - Образовательная игра</p>
+        </footer>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        // Инициализация карты
+        const map = L.map('map').setView([61.5240, 105.3188], 3);
+
+        // Добавление базового слоя карты
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        // Упрощенные координаты для демонстрации (в реальном проекте используйте GeoJSON)
+        const russiaBounds = [
+            [41.185, 19.638], // Юго-запад
+            [81.858, 190.0]   // Северо-восток
+        ];
+
+        // Устанавливаем границы отображения
+        map.setMaxBounds(russiaBounds);
+        map.setMinZoom(3);
+        map.setMaxZoom(7);
+
+        // Пример добавления регионов (упрощенно)
+        // В реальном проекте используйте GeoJSON файл с регионами России
+
+        // Московская область (пример)
+        const moscowRegion = L.circle([55.7558, 37.6173], {
+            color: 'blue',
+            fillColor: '#3388ff',
+            fillOpacity: 0.3,
+            radius: 200000
+        }).addTo(map);
+
+        moscowRegion.bindPopup(`
+            <h3>Москва</h3>
+            <p>Столица России</p>
+            <p>Население: ~12.5 млн</p>
+            <p>Площадь: 2,561 км²</p>
+        `);
+
+        // Санкт-Петербург
+        const spbRegion = L.circle([59.9343, 30.3351], {
+            color: 'red',
+            fillColor: '#ff3333',
+            fillOpacity: 0.3,
+            radius: 150000
+        }).addTo(map);
+
+        spbRegion.bindPopup(`
+            <h3>Санкт-Петербург</h3>
+            <p>Северная столица</p>
+            <p>Население: ~5.4 млн</p>
+            <p>Основан: 1703 год</p>
+        `);
+
+        // Уральский регион (пример)
+        const uralRegion = L.circle([56.8389, 60.6057], {
+            color: 'green',
+            fillColor: '#33cc33',
+            fillOpacity: 0.3,
+            radius: 300000
+        }).addTo(map);
+
+        uralRegion.bindPopup(`
+            <h3>Уральский федеральный округ</h3>
+            <p>Промышленный центр</p>
+            <p>Города: Екатеринбург, Челябинск</p>
+        `);
+
+        // Сибирь
+        const siberiaRegion = L.circle([61.5240, 105.3188], {
+            color: 'orange',
+            fillColor: '#ff9933',
+            fillOpacity: 0.3,
+            radius: 800000
+        }).addTo(map);
+
+        siberiaRegion.bindPopup(`
+            <h3>Сибирь</h3>
+            <p>Крупнейший географический регион</p>
+            <p>Богата природными ресурсами</p>
+        `);
+
+        // Дальний Восток
+        const farEastRegion = L.circle([48.4802, 135.0719], {
+            color: 'purple',
+            fillColor: '#9933ff',
+            fillOpacity: 0.3,
+            radius: 700000
+        }).addTo(map);
+
+        farEastRegion.bindPopup(`
+            <h3>Дальний Восток</h3>
+            <p>Восточная часть России</p>
+            <p>Выход к Тихому океану</p>
+        `);
+
+        // Обработчики событий для регионов
+        const regions = [moscowRegion, spbRegion, uralRegion, siberiaRegion, farEastRegion];
+        let foundRegions = 0;
+
+        regions.forEach(region => {
+            region.on('click', function(e) {
+                foundRegions++;
+                document.getElementById('found-count').textContent = foundRegions;
+
+                // Показываем информацию о регионе
+                const details = document.getElementById('region-details');
+                details.innerHTML = e.target.getPopup().getContent();
+
+                // Подсвечиваем найденный регион
+                region.setStyle({
+                    fillColor: '#4CAF50',
+                    fillOpacity: 0.6
+                });
+            });
+        });
+
+        // Обработчики кнопок
+        document.getElementById('hint-btn').addEventListener('click', function() {
+            alert('Подсказка: Попробуйте кликнуть на цветные круги на карте!');
+        });
+
+        document.getElementById('reset-btn').addEventListener('click', function() {
+            foundRegions = 0;
+            document.getElementById('found-count').textContent = foundRegions;
+
+            regions.forEach(region => {
+                region.setStyle({
+                    fillOpacity: 0.3
+                });
+            });
+
+            document.getElementById('region-details').innerHTML =
+                '<p>Нажмите на регион, чтобы узнать о нем больше</p>';
+        });
+    </script>
+</body>
+</html>
