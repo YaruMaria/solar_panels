@@ -1,161 +1,169 @@
 from flask import Flask, request, jsonify
 import folium
-from folium.plugins import MarkerCluster, MeasureControl, MiniMap, Fullscreen
-import random
+from folium.plugins import MarkerCluster, MeasureControl, MiniMap, Fullscreen, HeatMap
+import math
 
 app = Flask(__name__)
 
-# Российские города с координатами
-CITIES = {
-    'Москва': {'coords': [55.7558, 37.6176], 'color': '#FF0000', 'icon': 'star'},
-    'Санкт-Петербург': {'coords': [59.9390, 30.3158], 'color': '#0000FF', 'icon': 'university'},
-    'Новосибирск': {'coords': [55.0302, 82.9204], 'color': '#008000', 'icon': 'tree-conifer'},
-    'Екатеринбург': {'coords': [56.8380, 60.5973], 'color': '#FFA500', 'icon': 'industry'},
-    'Казань': {'coords': [55.7961, 49.1064], 'color': '#800080', 'icon': 'mosque'},
-    'Нижний Новгород': {'coords': [56.3269, 44.0065], 'color': '#00FFFF', 'icon': 'home'},
-    'Челябинск': {'coords': [55.1644, 61.4368], 'color': '#FF69B4', 'icon': 'industry'},
-    'Самара': {'coords': [53.1959, 50.1002], 'color': '#8B4513', 'icon': 'plane'},
-    'Омск': {'coords': [54.9893, 73.3682], 'color': '#2E8B57', 'icon': 'road'},
-    'Ростов-на-Дону': {'coords': [47.2224, 39.7187], 'color': '#DC143C', 'icon': 'ship'},
-    'Уфа': {'coords': [54.7351, 55.9587], 'color': '#FFD700', 'icon': 'oil'},
-    'Красноярск': {'coords': [56.0153, 92.8932], 'color': '#4B0082', 'icon': 'mountain'},
-    'Пермь': {'coords': [58.0105, 56.2502], 'color': '#00CED1', 'icon': 'factory'},
-    'Воронеж': {'coords': [51.6615, 39.2003], 'color': '#FF4500', 'icon': 'education'},
-    'Волгоград': {'coords': [48.7080, 44.5133], 'color': '#2F4F4F', 'icon': 'tower'},
-    'Краснодар': {'coords': [45.0355, 38.9753], 'color': '#32CD32', 'icon': 'sun'},
-    'Саратов': {'coords': [51.5336, 46.0342], 'color': '#8A2BE2', 'icon': 'road'},
-    'Тюмень': {'coords': [57.1530, 65.5343], 'color': '#FF6347', 'icon': 'oil'},
-    'Тольятти': {'coords': [53.5088, 49.4192], 'color': '#4682B4', 'icon': 'car'},
-    'Ижевск': {'coords': [56.8526, 53.2115], 'color': '#D2691E', 'icon': 'industry'},
-    'Барнаул': {'coords': [53.3548, 83.7699], 'color': '#5F9EA0', 'icon': 'wheat'},
-    'Ульяновск': {'coords': [54.3142, 48.4031], 'color': '#6495ED', 'icon': 'plane'},
-    'Иркутск': {'coords': [52.2896, 104.2806], 'color': '#DA70D6', 'icon': 'lake'},
-    'Хабаровск': {'coords': [48.4802, 135.0719], 'color': '#FF8C00', 'icon': 'east'},
-    'Ярославль': {'coords': [57.6261, 39.8845], 'color': '#7CFC00', 'icon': 'historic'},
-    'Владивосток': {'coords': [43.1155, 131.8855], 'color': '#1E90FF', 'icon': 'anchor'},
-    'Махачкала': {'coords': [42.9831, 47.5047], 'color': '#FF1493', 'icon': 'sun'},
-    'Томск': {'coords': [56.4846, 84.9482], 'color': '#00BFFF', 'icon': 'education'},
-    'Кемерово': {'coords': [55.3547, 86.0873], 'color': '#228B22', 'icon': 'industry'},
-    'Новокузнецк': {'coords': [53.7596, 87.1216], 'color': '#FFDAB9', 'icon': 'industry'},
-    'Рязань': {'coords': [54.6294, 39.7417], 'color': '#8FBC8F', 'icon': 'historic'},
-    'Астрахань': {'coords': [46.3497, 48.0408], 'color': '#B22222', 'icon': 'ship'},
-    'Пенза': {'coords': [53.1959, 45.0183], 'color': '#ADFF2F', 'icon': 'home'},
-    'Набережные Челны': {'coords': [55.7436, 52.3959], 'color': '#FF00FF', 'icon': 'industry'},
-    'Липецк': {'coords': [52.6088, 39.5992], 'color': '#DAA520', 'icon': 'industry'},
-    'Тула': {'coords': [54.1931, 37.6173], 'color': '#CD5C5C', 'icon': 'industry'},
-    'Киров': {'coords': [58.6036, 49.6680], 'color': '#9ACD32', 'icon': 'home'},
-    'Чебоксары': {'coords': [56.1463, 47.2511], 'color': '#FFB6C1', 'icon': 'home'},
-    'Калининград': {'coords': [54.7104, 20.4522], 'color': '#87CEEB', 'icon': 'ship'},
-    'Брянск': {'coords': [53.2436, 34.3634], 'color': '#6B8E23', 'icon': 'home'},
-    'Курск': {'coords': [51.7304, 36.1926], 'color': '#F08080', 'icon': 'home'},
-    'Иваново': {'coords': [57.0004, 40.9739], 'color': '#BA55D3', 'icon': 'industry'},
-    'Магнитогорск': {'coords': [53.4072, 58.9790], 'color': '#B0C4DE', 'icon': 'industry'},
-    'Тверь': {'coords': [56.8587, 35.9176], 'color': '#FFFAFA', 'icon': 'historic'},
-    'Ставрополь': {'coords': [45.0445, 41.9691], 'color': '#F0E68C', 'icon': 'sun'},
-    'Белгород': {'coords': [50.5956, 36.5873], 'color': '#ADD8E6', 'icon': 'home'},
-    'Сочи': {'coords': [43.5855, 39.7231], 'color': '#98FB98', 'icon': 'umbrella'},
+# Добавляем данные по солнечной инсоляции для регионов России (кВтч/м²/день)
+SOLAR_INSOLATION = {
+    'Москва': {'coords': [55.7558, 37.6176], 'insolation': 2.5, 'color': '#FF6B6B'},
+    'Санкт-Петербург': {'coords': [59.9390, 30.3158], 'insolation': 2.0, 'color': '#4ECDC4'},
+    'Новосибирск': {'coords': [55.0302, 82.9204], 'insolation': 3.0, 'color': '#FFEAA7'},
+    'Екатеринбург': {'coords': [56.8380, 60.5973], 'insolation': 2.8, 'color': '#DDA0DD'},
+    'Казань': {'coords': [55.7961, 49.1064], 'insolation': 2.7, 'color': '#96CEB4'},
+    'Сочи': {'coords': [43.5855, 39.7231], 'insolation': 3.5, 'color': '#FFD700'},
+    'Владивосток': {'coords': [43.1155, 131.8855], 'insolation': 3.2, 'color': '#1E90FF'},
+    'Красноярск': {'coords': [56.0153, 92.8932], 'insolation': 2.9, 'color': '#FF8C00'},
+    'Ростов-на-Дону': {'coords': [47.2224, 39.7187], 'insolation': 3.1, 'color': '#32CD32'},
+    'Волгоград': {'coords': [48.7080, 44.5133], 'insolation': 3.3, 'color': '#FF4500'},
+    'Махачкала': {'coords': [42.9831, 47.5047], 'insolation': 3.4, 'color': '#FF1493'},
+    'Калининград': {'coords': [54.7104, 20.4522], 'insolation': 2.3, 'color': '#87CEEB'},
+    'Хабаровск': {'coords': [48.4802, 135.0719], 'insolation': 3.1, 'color': '#DC143C'},
+    'Якутск': {'coords': [62.0278, 129.7315], 'insolation': 2.8, 'color': '#2F4F4F'},
+    'Севастополь': {'coords': [44.6167, 33.5254], 'insolation': 3.6, 'color': '#FF6347'},
+    'Астрахань': {'coords': [46.3497, 48.0408], 'insolation': 3.5, 'color': '#00CED1'},
+    'Краснодар': {'coords': [45.0355, 38.9753], 'insolation': 3.3, 'color': '#7CFC00'},
+    'Ставрополь': {'coords': [45.0445, 41.9691], 'insolation': 3.2, 'color': '#D2691E'},
+    'Самара': {'coords': [53.1959, 50.1002], 'insolation': 2.9, 'color': '#8A2BE2'},
+    'Уфа': {'coords': [54.7351, 55.9587], 'insolation': 2.7, 'color': '#FF00FF'},
 }
 
+# Зоны солнечной эффективности
+SOLAR_ZONES = [
+    {'name': 'Высокая эффективность', 'color': '#FFD700', 'min': 3.0, 'max': 4.0},
+    {'name': 'Средняя эффективность', 'color': '#FFA500', 'min': 2.5, 'max': 3.0},
+    {'name': 'Умеренная эффективность', 'color': '#87CEEB', 'min': 2.0, 'max': 2.5},
+    {'name': 'Низкая эффективность', 'color': '#B0C4DE', 'min': 1.5, 'max': 2.0},
+]
 
-def create_russian_map(selected_city=None):
-    """Создаем карту с российскими источниками"""
 
-    if selected_city and selected_city in CITIES:
-        center_lat, center_lon = CITIES[selected_city]['coords']
+def calculate_solar_potential(city_data, panel_area=10, efficiency=0.18):
+    """Рассчитывает потенциал солнечной энергии"""
+    daily_kwh = city_data['insolation'] * panel_area * efficiency
+    monthly_kwh = daily_kwh * 30
+    yearly_kwh = daily_kwh * 365
+
+    return {
+        'daily': round(daily_kwh, 2),
+        'monthly': round(monthly_kwh, 2),
+        'yearly': round(yearly_kwh, 2),
+        'savings': round(yearly_kwh * 5.5 / 1000, 2),  # Пример: 5.5 руб за кВтч
+        'co2_reduction': round(yearly_kwh * 0.4 / 1000, 2),  # тонн CO2 в год
+    }
+
+
+def create_solar_map(selected_city=None):
+    """Создаем карту солнечной энергии"""
+
+    if selected_city and selected_city in SOLAR_INSOLATION:
+        center_lat, center_lon = SOLAR_INSOLATION[selected_city]['coords']
         zoom = 10
     else:
         center_lat, center_lon = 61.5240, 105.3188
         zoom = 3
 
-    # Создаем базовую карту с российскими тайлами
+    # Создаем карту
     m = folium.Map(
         location=[center_lat, center_lon],
         zoom_start=zoom,
         min_zoom=3,
         max_zoom=15,
-        max_bounds=True,
-        min_lat=40,
-        max_lat=82,
-        min_lon=20,
-        max_lon=190,
         control_scale=True,
         zoom_control=True,
-        scrollWheelZoom=True
+        scrollWheelZoom=True,
+        tiles='CartoDB positron'
     )
 
-    # Добавляем российские тайл-слои
-    # 1. Основной слой - российский стиль
-    folium.TileLayer(
-        tiles='https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-        name='Карта России',
-        attr='© OpenStreetMap contributors',
-        overlay=False,
-        control=True
+    # Добавляем слой тепловой карты солнечной инсоляции
+    heat_data = []
+    for city_name, data in SOLAR_INSOLATION.items():
+        heat_data.append([data['coords'][0], data['coords'][1], data['insolation']])
+
+    HeatMap(
+        heat_data,
+        name="Солнечная инсоляция",
+        min_opacity=0.3,
+        max_zoom=12,
+        radius=30,
+        blur=20,
+        max_val=4.0,
+        gradient={0.2: 'blue', 0.4: 'lime', 0.6: 'yellow', 0.8: 'orange', 1: 'red'}
     ).add_to(m)
 
-    # 2. Топографическая карта (нейтральный источник)
-    folium.TileLayer(
-        tiles='https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
-        name='Топографическая',
-        attr='OpenTopoMap',
-        overlay=False,
-        control=True
-    ).add_to(m)
+    # Добавляем зоны эффективности
+    for zone in SOLAR_ZONES:
+        folium.GeoJson(
+            get_zone_geojson(zone),
+            name=zone['name'],
+            style_function=lambda x, zone_color=zone['color']: {
+                'fillColor': zone_color,
+                'color': zone_color,
+                'weight': 1,
+                'fillOpacity': 0.2
+            }
+        ).add_to(m)
 
-    # 3. Чистая карта без подписей
-    folium.TileLayer(
-        tiles='https://tiles.stadiamaps.com/tiles/stamen_toner_lite/{z}/{x}/{y}{r}.png',
-        name='Контурная',
-        attr='Stadia Maps',
-        overlay=False,
-        control=True
-    ).add_to(m)
-
-    # Контур России с градиентом
-    russia_bounds = [
-        [41.0, 19.0], [41.0, 190.0], [82.0, 190.0],
-        [82.0, 19.0], [41.0, 19.0]
-    ]
-
-    # Красивый градиент для России
-    folium.Polygon(
-        locations=russia_bounds,
-        color='#1E3A8A',
-        weight=3,
-        fill=True,
-        fill_color='#3B82F6',
-        fill_opacity=0.15,
-        tooltip='🇷🇺 Российская Федерация'
-    ).add_to(m)
-
-    # Добавляем кластер маркеров
-    marker_cluster = MarkerCluster(
-        name="Города России",
-        overlay=True,
-        control=False
-    ).add_to(m)
-
-    # Добавляем все города
-    for city_name, city_data in CITIES.items():
+    # Добавляем маркеры городов с солнечной информацией
+    for city_name, city_data in SOLAR_INSOLATION.items():
         is_selected = city_name == selected_city
+        solar_potential = calculate_solar_potential(city_data)
+
+        # Определяем цвет маркера в зависимости от инсоляции
+        marker_color = 'gray'
+        if city_data['insolation'] >= 3.0:
+            marker_color = 'red'  # Высокая
+        elif city_data['insolation'] >= 2.5:
+            marker_color = 'orange'  # Средняя
+        elif city_data['insolation'] >= 2.0:
+            marker_color = 'blue'  # Умеренная
+        else:
+            marker_color = 'gray'  # Низкая
 
         popup_html = f'''
-        <div style="min-width: 250px; font-family: Arial, sans-serif;">
+        <div style="min-width: 300px; font-family: Arial, sans-serif;">
             <div style="background: linear-gradient(135deg, {city_data['color']}, #FFFFFF);
                         padding: 15px; border-radius: 10px 10px 0 0; color: white; text-align: center;">
-                <h3 style="margin: 0; font-size: 18px;">{city_name}</h3>
+                <h3 style="margin: 0; font-size: 20px;">☀️ {city_name}</h3>
+                <p style="margin: 5px 0; font-size: 16px;">Солнечный потенциал</p>
             </div>
             <div style="padding: 15px; background: white;">
-                <p><strong>📍 Координаты:</strong><br>
-                Широта: {city_data['coords'][0]:.4f}<br>
-                Долгота: {city_data['coords'][1]:.4f}</p>
-                <p><strong>🎯 Статус:</strong> {'Выбранный город' if is_selected else 'Крупный город России'}</p>
-                <div style="margin-top: 10px; text-align: center;">
+                <div style="background: #f8f9fa; padding: 10px; border-radius: 5px; margin-bottom: 10px;">
+                    <p style="margin: 5px 0; font-size: 18px; color: #ff8c00;">
+                        <strong>Инсоляция:</strong> {city_data['insolation']} кВтч/м²/день
+                    </p>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
+                    <div style="background: #e3f2fd; padding: 8px; border-radius: 5px; text-align: center;">
+                        <div style="font-size: 12px; color: #666;">Дневная выработка</div>
+                        <div style="font-size: 18px; font-weight: bold; color: #2196F3;">
+                            {solar_potential['daily']} кВтч
+                        </div>
+                    </div>
+                    <div style="background: #e8f5e8; padding: 8px; border-radius: 5px; text-align: center;">
+                        <div style="font-size: 12px; color: #666;">Годовая выработка</div>
+                        <div style="font-size: 18px; font-weight: bold; color: #4CAF50;">
+                            {solar_potential['yearly']} кВтч
+                        </div>
+                    </div>
+                </div>
+
+                <div style="background: #fff3cd; padding: 10px; border-radius: 5px; margin-bottom: 10px;">
+                    <p style="margin: 5px 0; color: #856404;">
+                        <strong>💰 Годовая экономия:</strong> {solar_potential['savings']} тыс. руб
+                    </p>
+                    <p style="margin: 5px 0; color: #0c5460;">
+                        <strong>🌿 Сокращение CO2:</strong> {solar_potential['co2_reduction']} тонн
+                    </p>
+                </div>
+
+                <div style="text-align: center; margin-top: 10px;">
                     <button onclick="window.location.href='/?city={city_name}'" 
                             style="background: {city_data['color']}; color: white; 
-                                   border: none; padding: 8px 15px; 
-                                   border-radius: 5px; cursor: pointer;">
-                        Показать на карте
+                                   border: none; padding: 10px 20px; 
+                                   border-radius: 5px; cursor: pointer; font-weight: bold;">
+                        📍 Показать на карте
                     </button>
                 </div>
             </div>
@@ -166,66 +174,88 @@ def create_russian_map(selected_city=None):
             # Особый маркер для выбранного города
             folium.Marker(
                 location=city_data['coords'],
-                popup=folium.Popup(popup_html, max_width=300),
-                tooltip=f"★ {city_name} ★ (выбран)",
+                popup=folium.Popup(popup_html, max_width=350),
+                tooltip=f"☀️ {city_name} - {city_data['insolation']} кВтч/м²/день",
                 icon=folium.Icon(
                     color='red',
-                    icon='star',
+                    icon='sun',
                     prefix='fa',
-                    icon_color='white',
-                    icon_size=(30, 30)
+                    icon_color='white'
                 )
             ).add_to(m)
 
-            # Анимированный круг вокруг города
-            folium.Circle(
-                location=city_data['coords'],
-                radius=15000,
-                color=city_data['color'],
-                fill=True,
-                fill_color=city_data['color'],
-                fill_opacity=0.2,
-                weight=3
-            ).add_to(m)
-
-            # Линии от города к границам
-            for angle in range(0, 360, 45):
-                import math
-                lat_offset = math.sin(math.radians(angle)) * 5
-                lon_offset = math.cos(math.radians(angle)) * 5
+            # Солнечные лучи вокруг города
+            for angle in range(0, 360, 30):
+                rad = math.radians(angle)
+                lat_offset = math.sin(rad) * 0.5
+                lon_offset = math.cos(rad) * 0.5
 
                 folium.PolyLine(
                     locations=[
                         city_data['coords'],
                         [city_data['coords'][0] + lat_offset, city_data['coords'][1] + lon_offset]
                     ],
-                    color=city_data['color'],
-                    weight=1,
-                    opacity=0.5,
-                    dash_array='5, 10'
+                    color='#FFD700',
+                    weight=2,
+                    opacity=0.6,
+                    dash_array='10, 5'
                 ).add_to(m)
         else:
             # Обычные маркеры
             folium.CircleMarker(
                 location=city_data['coords'],
-                radius=8,
-                popup=folium.Popup(popup_html, max_width=300),
-                tooltip=city_name,
-                color=city_data['color'],
+                radius=10 + city_data['insolation'] * 2,  # Размер зависит от инсоляции
+                popup=folium.Popup(popup_html, max_width=350),
+                tooltip=f"{city_name}: {city_data['insolation']} кВтч/м²/день",
+                color=marker_color,
                 fill=True,
-                fill_color=city_data['color'],
-                fill_opacity=0.8,
+                fill_color=marker_color,
+                fill_opacity=0.7,
                 weight=2
-            ).add_to(marker_cluster)
+            ).add_to(m)
 
-    # Добавляем мини-карту с исправленной атрибуцией
-    minimap_tile_layer = folium.TileLayer(
-        tiles='https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-        attr='© OpenStreetMap contributors'
-    )
+    # Добавляем легенду
+    legend_html = '''
+    <div style="position: fixed; 
+                bottom: 50px; left: 50px; width: 300px;
+                background: white; padding: 15px; 
+                border-radius: 10px; box-shadow: 0 0 15px rgba(0,0,0,0.2);
+                z-index: 1000; font-family: Arial;">
+        <h4 style="margin-top: 0; color: #ff8c00;">☀️ Легенда солнечной карты</h4>
+        <div style="display: flex; align-items: center; margin: 5px 0;">
+            <div style="width: 15px; height: 15px; background: red; 
+                       border-radius: 50%; margin-right: 10px;"></div>
+            <span>Высокая эффективность (>3.0 кВтч)</span>
+        </div>
+        <div style="display: flex; align-items: center; margin: 5px 0;">
+            <div style="width: 15px; height: 15px; background: orange; 
+                       border-radius: 50%; margin-right: 10px;"></div>
+            <span>Средняя эффективность (2.5-3.0 кВтч)</span>
+        </div>
+        <div style="display: flex; align-items: center; margin: 5px 0;">
+            <div style="width: 15px; height: 15px; background: blue; 
+                       border-radius: 50%; margin-right: 10px;"></div>
+            <span>Умеренная эффективность (2.0-2.5 кВтч)</span>
+        </div>
+        <div style="display: flex; align-items: center; margin: 5px 0;">
+            <div style="width: 15px; height: 15px; background: gray; 
+                       border-radius: 50%; margin-right: 10px;"></div>
+            <span>Низкая эффективность (<2.0 кВтч)</span>
+        </div>
+        <hr style="margin: 10px 0;">
+        <p style="font-size: 12px; color: #666; margin: 0;">
+            💡 <strong>Данные:</strong> Среднегодовая солнечная инсоляция
+        </p>
+        <p style="font-size: 12px; color: #666; margin: 5px 0 0 0;">
+            🏠 <strong>Расчет:</strong> Для 10м² панелей с КПД 18%
+        </p>
+    </div>
+    '''
+    m.get_root().html.add_child(folium.Element(legend_html))
 
+    # Добавляем мини-карту
     MiniMap(
-        tile_layer=minimap_tile_layer,
+        tile_layer='CartoDB positron',
         position='bottomright',
         width=150,
         height=150
@@ -234,28 +264,14 @@ def create_russian_map(selected_city=None):
     # Добавляем полноэкранный режим
     Fullscreen(
         position='topleft',
-        title='Полноэкранный режим',
-        title_cancel='Выйти из полноэкранного режима'
+        title='Полноэкранный режим'
     ).add_to(m)
 
     # Добавляем линейку
     MeasureControl(
         position='topleft',
-        primary_length_unit='kilometers',
-        secondary_length_unit='meters',
-        primary_area_unit='sqkilometers',
-        secondary_area_unit='hectares'
+        primary_length_unit='kilometers'
     ).add_to(m)
-
-    # Добавляем кнопку для печати (используем локальную иконку или убираем)
-    # from folium.plugins import FloatImage
-    # FloatImage(
-    #     'https://img.icons8.com/color/48/000000/print.png',
-    #     bottom=10,
-    #     left=10,
-    #     width='48px',
-    #     height='48px'
-    # ).add_to(m)
 
     # Добавляем управление слоями
     folium.LayerControl(collapsed=False, position='topright').add_to(m)
@@ -263,13 +279,38 @@ def create_russian_map(selected_city=None):
     return m
 
 
+def get_zone_geojson(zone):
+    """Возвращает GeoJSON для зоны"""
+    # Упрощенный GeoJSON для демонстрации
+    return {
+        "type": "FeatureCollection",
+        "features": [
+            {
+                "type": "Feature",
+                "properties": {"name": zone['name']},
+                "geometry": {
+                    "type": "Polygon",
+                    "coordinates": [[
+                        [40, 50], [40, 60], [50, 60], [50, 50], [40, 50]
+                    ]]
+                }
+            }
+        ]
+    }
+
+
 @app.route('/')
 def index():
     city = request.args.get('city', '').strip()
 
     # Создаем карту
-    m = create_russian_map(city if city in CITIES else None)
+    m = create_solar_map(city if city in SOLAR_INSOLATION else None)
     map_html = m._repr_html_()
+
+    # Получаем данные для выбранного города
+    solar_data = None
+    if city in SOLAR_INSOLATION:
+        solar_data = calculate_solar_potential(SOLAR_INSOLATION[city])
 
     # Генерируем HTML
     html = f'''
@@ -278,7 +319,7 @@ def index():
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>🇷🇺 Карта России - Найди свой город</title>
+        <title>☀️ Солнечная карта России - Потенциал солнечной энергии</title>
         <style>
             * {{
                 margin: 0;
@@ -290,6 +331,7 @@ def index():
                 font-family: 'Arial', sans-serif;
                 background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
                 min-height: 100vh;
+                color: #333;
             }}
 
             .container {{
@@ -300,7 +342,7 @@ def index():
                 box-shadow: 0 0 30px rgba(0, 0, 0, 0.3);
             }}
 
-            /* ШАПКА С ПОИСКОМ */
+            /* ШАПКА */
             .header {{
                 background: linear-gradient(90deg, #1a237e, #283593);
                 padding: 15px 25px;
@@ -324,6 +366,7 @@ def index():
             .logo-icon {{
                 font-size: 40px;
                 animation: pulse 2s infinite;
+                color: #FFD700;
             }}
 
             @keyframes pulse {{
@@ -345,7 +388,7 @@ def index():
                 color: #bbdefb;
             }}
 
-            /* БОЛЬШАЯ КНОПКА ПОИСКА */
+            /* ПОИСК */
             .search-container {{
                 background: rgba(255, 255, 255, 0.1);
                 padding: 20px;
@@ -390,8 +433,8 @@ def index():
 
             #search-btn {{
                 padding: 18px 40px;
-                background: linear-gradient(45deg, #ff5252, #ff4081);
-                color: white;
+                background: linear-gradient(45deg, #FFD700, #FF8C00);
+                color: #333;
                 border: none;
                 border-radius: 50px;
                 font-size: 18px;
@@ -400,7 +443,7 @@ def index():
                 display: flex;
                 align-items: center;
                 gap: 12px;
-                box-shadow: 0 6px 20px rgba(255, 82, 82, 0.4);
+                box-shadow: 0 6px 20px rgba(255, 215, 0, 0.4);
                 transition: all 0.3s;
                 min-width: 200px;
                 justify-content: center;
@@ -408,12 +451,7 @@ def index():
 
             #search-btn:hover {{
                 transform: translateY(-3px);
-                box-shadow: 0 10px 25px rgba(255, 82, 82, 0.6);
-                background: linear-gradient(45deg, #ff4081, #ff5252);
-            }}
-
-            #search-btn:active {{
-                transform: translateY(-1px);
+                box-shadow: 0 10px 25px rgba(255, 140, 0, 0.6);
             }}
 
             .quick-search {{
@@ -425,9 +463,9 @@ def index():
 
             .quick-btn {{
                 padding: 10px 20px;
-                background: rgba(255, 255, 255, 0.15);
+                background: rgba(255, 215, 0, 0.2);
                 color: white;
-                border: 1px solid rgba(255, 255, 255, 0.3);
+                border: 1px solid rgba(255, 215, 0, 0.3);
                 border-radius: 25px;
                 cursor: pointer;
                 transition: all 0.3s;
@@ -435,7 +473,7 @@ def index():
             }}
 
             .quick-btn:hover {{
-                background: rgba(255, 255, 255, 0.3);
+                background: rgba(255, 215, 0, 0.4);
                 transform: translateY(-2px);
             }}
 
@@ -457,37 +495,130 @@ def index():
                 height: 100%;
             }}
 
-            /* ПАНЕЛЬ ИНФОРМАЦИИ */
-            .info-panel {{
+            /* ПАНЕЛЬ СОЛНЕЧНЫХ ДАННЫХ */
+            .solar-panel {{
                 position: absolute;
                 top: 20px;
                 left: 20px;
-                width: 300px;
+                width: 350px;
                 background: rgba(255, 255, 255, 0.95);
                 border-radius: 15px;
-                padding: 20px;
+                padding: 25px;
                 box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
                 backdrop-filter: blur(10px);
                 border: 1px solid rgba(255, 255, 255, 0.3);
                 z-index: 1000;
             }}
 
-            .city-info {{
+            .city-header {{
                 text-align: center;
                 margin-bottom: 20px;
             }}
 
             .city-name {{
-                font-size: 24px;
+                font-size: 26px;
                 font-weight: bold;
                 color: #1a237e;
+                margin-bottom: 5px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 10px;
+            }}
+
+            .solar-stats {{
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 15px;
+                margin-bottom: 20px;
+            }}
+
+            .stat-card {{
+                background: white;
+                padding: 15px;
+                border-radius: 10px;
+                box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+                text-align: center;
+                transition: transform 0.3s;
+            }}
+
+            .stat-card:hover {{
+                transform: translateY(-5px);
+            }}
+
+            .stat-value {{
+                font-size: 24px;
+                font-weight: bold;
+                margin: 10px 0;
+            }}
+
+            .stat-label {{
+                font-size: 12px;
+                color: #666;
+                text-transform: uppercase;
+                letter-spacing: 1px;
+            }}
+
+            .insolation {{
+                font-size: 36px;
+                color: #FF8C00;
+                font-weight: bold;
+            }}
+
+            .energy-color {{
+                color: #2196F3;
+            }}
+
+            .money-color {{
+                color: #4CAF50;
+            }}
+
+            .co2-color {{
+                color: #0c5460;
+            }}
+
+            .calculator {{
+                background: #f8f9fa;
+                padding: 20px;
+                border-radius: 10px;
+                margin-bottom: 20px;
+            }}
+
+            .calculator h4 {{
+                margin-bottom: 15px;
+                color: #1a237e;
+            }}
+
+            .input-group {{
                 margin-bottom: 10px;
             }}
 
-            .city-coords {{
-                font-size: 14px;
+            .input-group label {{
+                display: block;
+                margin-bottom: 5px;
                 color: #666;
-                margin-bottom: 15px;
+                font-size: 14px;
+            }}
+
+            .input-group input {{
+                width: 100%;
+                padding: 10px;
+                border: 1px solid #ddd;
+                border-radius: 5px;
+                font-size: 16px;
+            }}
+
+            .calculate-btn {{
+                width: 100%;
+                padding: 12px;
+                background: linear-gradient(45deg, #FFD700, #FF8C00);
+                color: #333;
+                border: none;
+                border-radius: 10px;
+                font-size: 16px;
+                font-weight: bold;
+                cursor: pointer;
+                margin-top: 10px;
             }}
 
             .controls {{
@@ -516,64 +647,6 @@ def index():
                 box-shadow: 0 5px 15px rgba(26, 35, 126, 0.4);
             }}
 
-            .stats {{
-                margin-top: 20px;
-                padding-top: 20px;
-                border-top: 1px solid #e0e0e0;
-            }}
-
-            .stat-item {{
-                display: flex;
-                justify-content: space-between;
-                margin-bottom: 8px;
-                font-size: 14px;
-            }}
-
-            .stat-value {{
-                font-weight: bold;
-                color: #1a237e;
-            }}
-
-            /* ПАНЕЛЬ С ГОРОДАМИ */
-            .cities-panel {{
-                position: absolute;
-                bottom: 20px;
-                left: 50%;
-                transform: translateX(-50%);
-                width: 90%;
-                max-width: 800px;
-                background: rgba(255, 255, 255, 0.95);
-                border-radius: 15px;
-                padding: 15px;
-                box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
-                z-index: 1000;
-                max-height: 150px;
-                overflow-y: auto;
-            }}
-
-            .cities-grid {{
-                display: grid;
-                grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-                gap: 8px;
-            }}
-
-            .city-item {{
-                padding: 8px 12px;
-                background: #e3f2fd;
-                border-radius: 8px;
-                cursor: pointer;
-                text-align: center;
-                font-size: 13px;
-                transition: all 0.3s;
-                border: 1px solid transparent;
-            }}
-
-            .city-item:hover {{
-                background: #bbdefb;
-                transform: translateY(-2px);
-                border-color: #1a237e;
-            }}
-
             /* ФУТЕР */
             .footer {{
                 background: #1a237e;
@@ -583,23 +656,9 @@ def index():
                 font-size: 14px;
             }}
 
-            /* АДАПТИВНОСТЬ */
-            @media (max-width: 1024px) {{
-                .info-panel {{
-                    width: 250px;
-                }}
-
-                #search-btn {{
-                    min-width: 150px;
-                    padding: 15px 30px;
-                }}
-            }}
-
             @media (max-width: 768px) {{
-                .header-top {{
-                    flex-direction: column;
-                    text-align: center;
-                    gap: 15px;
+                .solar-panel {{
+                    display: none;
                 }}
 
                 .search-box {{
@@ -609,124 +668,51 @@ def index():
                 #search-btn {{
                     width: 100%;
                 }}
-
-                .info-panel {{
-                    display: none;
-                }}
-
-                .cities-panel {{
-                    width: 95%;
-                    max-height: 120px;
-                }}
-
-                .cities-grid {{
-                    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-                }}
-            }}
-
-            /* СКРОЛЛБАР */
-            ::-webkit-scrollbar {{
-                width: 8px;
-                height: 8px;
-            }}
-
-            ::-webkit-scrollbar-track {{
-                background: #f1f1f1;
-                border-radius: 4px;
-            }}
-
-            ::-webkit-scrollbar-thumb {{
-                background: linear-gradient(135deg, #1a237e, #3949ab);
-                border-radius: 4px;
-            }}
-
-            /* АНИМАЦИИ */
-            @keyframes slideIn {{
-                from {{ opacity: 0; transform: translateY(30px); }}
-                to {{ opacity: 1; transform: translateY(0); }}
-            }}
-
-            .slide-in {{
-                animation: slideIn 0.5s ease-out;
-            }}
-
-            /* ВСПЛЫВАЮЩИЕ УВЕДОМЛЕНИЯ */
-            .notification {{
-                position: fixed;
-                top: 20px;
-                right: 20px;
-                background: linear-gradient(135deg, #4CAF50, #2E7D32);
-                color: white;
-                padding: 15px 25px;
-                border-radius: 10px;
-                box-shadow: 0 5px 20px rgba(0, 0, 0, 0.3);
-                z-index: 2000;
-                display: none;
-                animation: slideIn 0.3s ease-out;
-            }}
-
-            .notification.error {{
-                background: linear-gradient(135deg, #f44336, #c62828);
             }}
         </style>
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     </head>
     <body>
-        <div class="container slide-in">
+        <div class="container">
             <!-- ШАПКА -->
             <div class="header">
                 <div class="header-top">
                     <div class="logo">
                         <div class="logo-icon">
-                            <i class="fas fa-map-marked-alt"></i>
+                            <i class="fas fa-solar-panel"></i>
                         </div>
                         <div class="logo-text">
-                            <h1>🇷🇺 Карта России</h1>
-                            <p>Найдите свой город на карте нашей страны</p>
+                            <h1>☀️ Солнечная карта России</h1>
+                            <p>Оцените потенциал солнечной энергии в вашем регионе</p>
                         </div>
                     </div>
 
                     <div style="color: #bbdefb; font-size: 14px;">
-                        <i class="fas fa-users"></i> {len(CITIES)} городов доступно
+                        <i class="fas fa-sun"></i> {len(SOLAR_INSOLATION)} солнечных регионов
                     </div>
                 </div>
 
                 <div class="search-container">
                     <div class="search-title">
                         <i class="fas fa-search-location"></i>
-                        ПОИСК ГОРОДА В РОССИИ
+                        НАЙДИТЕ ВАШ ГОРОД ДЛЯ РАСЧЕТА
                     </div>
 
                     <div class="search-box">
                         <input type="text" 
                                id="city-input" 
-                               placeholder="Введите название вашего города..."
+                               placeholder="Введите ваш город для расчета солнечного потенциала..."
                                value="{city}"
-                               autocomplete="off"
-                               list="cities-list">
+                               autocomplete="off">
 
                         <button id="search-btn" onclick="searchCity()">
-                            <i class="fas fa-search"></i>
-                            НАЙТИ ГОРОД
+                            <i class="fas fa-sun"></i>
+                            РАССЧИТАТЬ ПОТЕНЦИАЛ
                         </button>
                     </div>
 
                     <div class="quick-search">
-                        <div class="quick-btn" onclick="searchCityByName('Москва')">
-                            <i class="fas fa-star"></i> Москва
-                        </div>
-                        <div class="quick-btn" onclick="searchCityByName('Санкт-Петербург')">
-                            <i class="fas fa-university"></i> Санкт-Петербург
-                        </div>
-                        <div class="quick-btn" onclick="searchCityByName('Новосибирск')">
-                            <i class="fas fa-tree"></i> Новосибирск
-                        </div>
-                        <div class="quick-btn" onclick="searchCityByName('Екатеринбург')">
-                            <i class="fas fa-industry"></i> Екатеринбург
-                        </div>
-                        <div class="quick-btn" onclick="searchCityByName('Казань')">
-                            <i class="fas fa-mosque"></i> Казань
-                        </div>
+                        {' '.join([f'<div class="quick-btn" onclick="searchCityByName(\'{city_name}\')"><i class="fas fa-city"></i> {city_name}</div>' for city_name in list(SOLAR_INSOLATION.keys())[:5]])}
                     </div>
                 </div>
             </div>
@@ -736,48 +722,77 @@ def index():
                 <div class="map-container">
                     <div id="map">{map_html}</div>
 
-                    <!-- ПАНЕЛЬ ИНФОРМАЦИИ -->
-                    <div class="info-panel">
-                        <div class="city-info">
-                            <div class="city-name" id="current-city-name">
-                                {city if city in CITIES else 'Вся Россия'}
+                    <!-- ПАНЕЛЬ СОЛНЕЧНЫХ ДАННЫХ -->
+                    <div class="solar-panel">
+                        <div class="city-header">
+                            <div class="city-name">
+                                {city if city in SOLAR_INSOLATION else 'Выберите город'}
                             </div>
-                            <div class="city-coords" id="current-city-coords">
-                                {f"Широта: {CITIES[city]['coords'][0]:.4f}, Долгота: {CITIES[city]['coords'][1]:.4f}" if city in CITIES else 'Выберите город для просмотра координат'}
+                        </div>
+
+                        {f'''
+                        <div style="background: #fff3e0; padding: 15px; border-radius: 10px; margin-bottom: 20px;">
+                            <p style="font-size: 18px; color: #e65100; text-align: center; margin: 0;">
+                                ☀️ Солнечная инсоляция: 
+                                <span style="font-weight: bold;">{SOLAR_INSOLATION[city]['insolation']} кВтч/м²/день</span>
+                            </p>
+                        </div>
+
+                        <div class="solar-stats">
+                            <div class="stat-card">
+                                <div class="stat-label">ДНЕВНАЯ ВЫРАБОТКА</div>
+                                <div class="stat-value energy-color">{solar_data['daily']} кВтч</div>
+                                <div style="font-size: 12px; color: #666;">Для 10м² панелей</div>
                             </div>
+                            <div class="stat-card">
+                                <div class="stat-label">ГОДОВАЯ ВЫРАБОТКА</div>
+                                <div class="stat-value energy-color">{solar_data['yearly']} кВтч</div>
+                                <div style="font-size: 12px; color: #666;">Энергии в год</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-label">ГОДОВАЯ ЭКОНОМИЯ</div>
+                                <div class="stat-value money-color">{solar_data['savings']} тыс.руб</div>
+                                <div style="font-size: 12px; color: #666;">Стоимость энергии</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-label">СОКРАЩЕНИЕ CO2</div>
+                                <div class="stat-value co2-color">{solar_data['co2_reduction']} тонн</div>
+                                <div style="font-size: 12px; color: #666;">Экология в год</div>
+                            </div>
+                        </div>
+                        ''' if city in SOLAR_INSOLATION else '''
+                        <div style="text-align: center; padding: 30px; color: #666;">
+                            <i class="fas fa-sun" style="font-size: 50px; color: #ffd700; margin-bottom: 20px;"></i>
+                            <p style="font-size: 16px; margin-bottom: 10px;">Выберите город для просмотра</p>
+                            <p style="font-size: 14px;">солнечного потенциала и расчетов</p>
+                        </div>
+                        '''}
+
+                        <div class="calculator">
+                            <h4><i class="fas fa-calculator"></i> Калькулятор солнечных панелей</h4>
+                            <div class="input-group">
+                                <label for="panel-area">Площадь панелей (м²)</label>
+                                <input type="number" id="panel-area" value="10" min="1" max="100">
+                            </div>
+                            <div class="input-group">
+                                <label for="efficiency">КПД панелей (%)</label>
+                                <input type="number" id="efficiency" value="18" min="1" max="30" step="0.1">
+                            </div>
+                            <button class="calculate-btn" onclick="calculateSolar()">
+                                <i class="fas fa-bolt"></i> ПЕРЕСЧИТАТЬ
+                            </button>
                         </div>
 
                         <div class="controls">
                             <button class="control-btn" onclick="zoomIn()">
-                                <i class="fas fa-search-plus"></i> Приблизить
-                            </button>
-                            <button class="control-btn" onclick="zoomOut()">
-                                <i class="fas fa-search-minus"></i> Отдалить
+                                <i class="fas fa-search-plus"></i> Приблизить карту
                             </button>
                             <button class="control-btn" onclick="resetMap()">
                                 <i class="fas fa-globe-europe"></i> Вся Россия
                             </button>
-                            <button class="control-btn" onclick="showAllCities()">
-                                <i class="fas fa-city"></i> Все города
+                            <button class="control-btn" onclick="showBestRegions()">
+                                <i class="fas fa-star"></i> Лучшие регионы
                             </button>
-                        </div>
-
-                        <div class="stats">
-                            <div class="stat-item">
-                                <span>Городов на карте:</span>
-                                <span class="stat-value">{len(CITIES)}</span>
-                            </div>
-                            <div class="stat-item">
-                                <span>Выбран город:</span>
-                                <span class="stat-value">{'Да' if city in CITIES else 'Нет'}</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- ПАНЕЛЬ С ГОРОДАМИ -->
-                    <div class="cities-panel">
-                        <div class="cities-grid" id="cities-grid">
-                            {' '.join([f'<div class="city-item" onclick="searchCityByName(\'{name}\')">{name}</div>' for name in sorted(CITIES.keys())])}
                         </div>
                     </div>
                 </div>
@@ -786,53 +801,21 @@ def index():
             <!-- ФУТЕР -->
             <div class="footer">
                 <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
-                    <div>© 2025 Карта России - Все города Российской Федерации</div>
-                    <div>🇷🇺 Сделано в России</div>
-                    <div><i class="fas fa-heart" style="color: #ff5252;"></i> Для всех россиян</div>
+                    <div>© 2025 Солнечная карта России - Потенциал возобновляемой энергии</div>
+                    <div>🇷🇺 Энергия солнца для будущего России</div>
+                    <div><i class="fas fa-leaf" style="color: #4CAF50;"></i> Чистая энергия для чистого будущего</div>
                 </div>
             </div>
-
-            <!-- УВЕДОМЛЕНИЯ -->
-            <div class="notification" id="notification"></div>
-
-            <!-- DATALIST ДЛЯ АВТОДОПОЛНЕНИЯ -->
-            <datalist id="cities-list">
-                {' '.join([f'<option value="{name}">' for name in CITIES.keys()])}
-            </datalist>
         </div>
 
         <script>
-            // ОСНОВНЫЕ ФУНКЦИИ
+            // Основные функции
             function searchCity() {{
                 const input = document.getElementById('city-input');
                 const city = input.value.trim();
 
-                if (!city) {{
-                    showNotification('Введите название города', 'error');
-                    input.focus();
-                    return;
-                }}
-
-                const cities = {list(CITIES.keys())};
-                const foundCity = cities.find(c => 
-                    c.toLowerCase() === city.toLowerCase() ||
-                    c.toLowerCase().includes(city.toLowerCase())
-                );
-
-                if (foundCity) {{
-                    window.location.href = '/?city=' + encodeURIComponent(foundCity);
-                }} else {{
-                    showNotification('Город не найден. Попробуйте другой.', 'error');
-                    // Предлагаем похожие города
-                    const similar = cities.filter(c => 
-                        c.toLowerCase().includes(city.toLowerCase().substring(0, 3))
-                    ).slice(0, 5);
-
-                    if (similar.length > 0) {{
-                        setTimeout(() => {{
-                            showNotification('Возможно вы искали: ' + similar.join(', '));
-                        }}, 1000);
-                    }}
+                if (city) {{
+                    window.location.href = '/?city=' + encodeURIComponent(city);
                 }}
             }}
 
@@ -845,15 +828,6 @@ def index():
                 const iframe = document.querySelector('#map iframe');
                 if (iframe && iframe.contentWindow && iframe.contentWindow.map) {{
                     iframe.contentWindow.map.zoomIn();
-                    showNotification('Карта приближена');
-                }}
-            }}
-
-            function zoomOut() {{
-                const iframe = document.querySelector('#map iframe');
-                if (iframe && iframe.contentWindow && iframe.contentWindow.map) {{
-                    iframe.contentWindow.map.zoomOut();
-                    showNotification('Карта отдалена');
                 }}
             }}
 
@@ -861,85 +835,55 @@ def index():
                 window.location.href = '/';
             }}
 
-            function showAllCities() {{
-                document.getElementById('cities-grid').scrollIntoView({{
-                    behavior: 'smooth'
-                }});
-                showNotification('Показаны все города России');
+            function showBestRegions() {{
+                // Показать регионы с лучшей инсоляцией
+                alert('Лучшие регионы для солнечных панелей: Сочи, Махачкала, Астрахань, Краснодар');
             }}
 
-            // УВЕДОМЛЕНИЯ
-            function showNotification(message, type = 'success') {{
-                const notification = document.getElementById('notification');
-                notification.textContent = message;
-                notification.className = 'notification';
-                notification.classList.add(type);
-                notification.style.display = 'block';
+            // Калькулятор солнечной энергии
+            function calculateSolar() {{
+                const panelArea = parseFloat(document.getElementById('panel-area').value);
+                const efficiency = parseFloat(document.getElementById('efficiency').value) / 100;
 
-                setTimeout(() => {{
-                    notification.style.display = 'none';
-                }}, 3000);
+                const city = '{city}';
+                if (city && city in {list(SOLAR_INSOLATION.keys())}) {{
+                    const insolation = {SOLAR_INSOLATION[city]['insolation'] if city in SOLAR_INSOLATION else 2.5};
+
+                    // Расчеты
+                    const daily = insolation * panelArea * efficiency;
+                    const yearly = daily * 365;
+                    const savings = (yearly * 5.5 / 1000).toFixed(2);
+                    const co2 = (yearly * 0.4 / 1000).toFixed(2);
+
+                    // Обновление данных
+                    document.querySelectorAll('.stat-card')[0].querySelector('.stat-value').textContent = 
+                        daily.toFixed(2) + ' кВтч';
+                    document.querySelectorAll('.stat-card')[1].querySelector('.stat-value').textContent = 
+                        yearly.toFixed(0) + ' кВтч';
+                    document.querySelectorAll('.stat-card')[2].querySelector('.stat-value').textContent = 
+                        savings + ' тыс.руб';
+                    document.querySelectorAll('.stat-card')[3].querySelector('.stat-value').textContent = 
+                        co2 + ' тонн';
+
+                    alert('Расчет обновлен для новых параметров!');
+                }} else {{
+                    alert('Сначала выберите город для расчета');
+                }}
             }}
 
-            // АВТОДОПОЛНЕНИЕ
-            const cityInput = document.getElementById('city-input');
-            const cities = {list(CITIES.keys())};
-
-            cityInput.addEventListener('input', function() {{
-                const value = this.value.toLowerCase();
-                if (value.length > 2) {{
-                    // Можно добавить динамическое автодополнение
+            // Автоматический фокус на поле ввода
+            window.addEventListener('load', function() {{
+                if (!'{city}') {{
+                    document.getElementById('city-input').focus();
                 }}
             }});
 
-            // ПОИСК ПО ENTER
-            cityInput.addEventListener('keypress', function(e) {{
+            // Поиск по Enter
+            document.getElementById('city-input').addEventListener('keypress', function(e) {{
                 if (e.key === 'Enter') {{
                     searchCity();
                 }}
             }});
-
-            // ФОКУС НА ПОЛЕ ВВОДА ПРИ ЗАГРУЗКЕ
-            window.addEventListener('load', function() {{
-                if (!'{city}') {{
-                    cityInput.focus();
-                }}
-
-                // Скрываем стандартные элементы управления картой
-                setTimeout(() => {{
-                    const controls = document.querySelector('.leaflet-control-container');
-                    if (controls) {{
-                        controls.style.opacity = '0.9';
-                    }}
-
-                    // Анимация для кнопки поиска
-                    const searchBtn = document.getElementById('search-btn');
-                    searchBtn.style.animation = 'pulse 2s infinite';
-                }}, 1000);
-            }});
-
-            // ОБНОВЛЕНИЕ ИНФОРМАЦИИ О ГОРОДЕ
-            function updateCityInfo() {{
-                const city = '{city}';
-                if (city && {str(city in CITIES).lower()}) {{
-                    document.getElementById('current-city-name').textContent = city;
-                    const coords = {CITIES[city]['coords'] if city in CITIES else [0, 0]};
-                    document.getElementById('current-city-coords').textContent = 
-                        `Широта: ${{coords[0].toFixed(4)}}, Долгота: ${{coords[1].toFixed(4)}}`;
-
-                    // Подсветка выбранного города в списке
-                    const cityItems = document.querySelectorAll('.city-item');
-                    cityItems.forEach(item => {{
-                        if (item.textContent === city) {{
-                            item.style.background = '#1a237e';
-                            item.style.color = 'white';
-                            item.style.fontWeight = 'bold';
-                        }}
-                    }});
-                }}
-            }}
-
-            updateCityInfo();
         </script>
     </body>
     </html>
@@ -948,25 +892,16 @@ def index():
     return html
 
 
-@app.route('/api/cities')
-def api_cities():
-    """API для получения списка городов"""
-    return jsonify({
-        'success': True,
-        'cities': list(CITIES.keys()),
-        'count': len(CITIES)
-    })
-
-
-@app.route('/api/city/<city_name>')
-def api_city(city_name):
-    """API для получения информации о городе"""
-    if city_name in CITIES:
+@app.route('/api/solar-data/<city_name>')
+def get_solar_data(city_name):
+    """API для получения данных по солнечной энергии"""
+    if city_name in SOLAR_INSOLATION:
+        solar_potential = calculate_solar_potential(SOLAR_INSOLATION[city_name])
         return jsonify({
             'success': True,
             'city': city_name,
-            'coordinates': CITIES[city_name]['coords'],
-            'color': CITIES[city_name]['color']
+            'insolation': SOLAR_INSOLATION[city_name]['insolation'],
+            'potential': solar_potential
         })
     return jsonify({'success': False, 'error': 'Город не найден'}), 404
 
